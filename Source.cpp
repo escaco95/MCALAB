@@ -6,7 +6,12 @@ typedef unsigned int UINT;
 
 struct node {
 	struct node* next[2];
-	int value;
+	void* value;
+};
+
+struct queue {
+	struct node* head;
+	struct node* tail;
 };
 
 struct tree {
@@ -14,9 +19,10 @@ struct tree {
 };
 
 typedef struct node* Node;
+typedef struct queue* Queue;
 typedef struct tree* Tree;
 
-Node CreateNode(int v) {
+Node CreateNode(void* v) {
 	Node nptr = (Node)malloc(sizeof(node));
 	nptr->value = v;
 	nptr->next[0] = NULL;
@@ -30,20 +36,66 @@ void NodeInsertNode(Node dst, Node src) {
 	else
 		dst->next[i] = src;
 }
+void NodeSetChild(Node dst, Node src, int i) {
+	dst->next[i] = src;
+}
 void NodePrint(Node src, int depth) {
 	int i;
-	for (i=0; i<depth; i++)
+	for (i = 0; i<depth; i++)
 		printf("   ");
 	printf("%d\n", src->value);
 	for (i=0; i<2; i++)
 		if (src->next[i])
 			NodePrint(src->next[i], depth + (1 - i));
 }
-void DestroyNode(Node nptr) {
+void DestroyNode(Node nptr,int mx) {
 	int i = 0;
-	for (;i < 2;i++)
+	for (;i < mx;i++)
 		if (nptr->next[i])
-			DestroyNode(nptr->next[i]);
+			DestroyNode(nptr->next[i], mx);
+	free(nptr);
+}
+void KillNode(Node nptr) {
+	free(nptr);
+}
+
+Queue CreateQueue(void) {
+	Queue qptr = (Queue)malloc(sizeof(queue));
+	qptr->head = NULL;
+	qptr->tail = NULL;
+	return qptr;
+}
+void Enqueue(Queue qptr, void* i) {
+	Node src = CreateNode(i);
+	if (qptr->head)
+		NodeSetChild(qptr->head, src, 0);
+	qptr->head = src;
+	if (!qptr->tail)
+		qptr->tail = src;
+}
+void* Dequeue(Queue qptr) {
+	void* r;
+	Node dst;
+	if (!qptr->tail)
+		return 0;
+	dst = qptr->tail;
+	r = dst->value;
+	qptr->tail = dst->next[0];
+	if (qptr->tail == qptr->head)
+		qptr->head = NULL;
+	KillNode(dst);
+	return r;
+}
+int QueueEmpty(Queue qptr) {
+	return qptr->tail == NULL;
+}
+void QueueClear(Queue qptr) {
+	if (qptr->tail)
+		DestroyNode(qptr->tail, 1);
+}
+void DestroyQueue(Queue qptr) {
+	QueueClear(qptr);
+	free(qptr);
 }
 
 Tree CreateTree(void) {
@@ -62,9 +114,32 @@ void TreePrint(Tree tptr) {
 	if (tptr->head)
 		NodePrint(tptr->head, 0);
 }
+void TreePrintWithQueue(Tree tptr) {
+	Queue qptr;
+	if (!tptr->head)
+		return;
+	qptr = CreateQueue();
+	Enqueue(qptr, tptr->head);
+	Enqueue(qptr, (void*)0);
+	while (!QueueEmpty(qptr)) {
+		int i;
+		Node src = (Node)Dequeue(qptr);
+		int depth = (int)Dequeue(qptr);
+			for (i = 0; i<depth; i++)
+				printf("   ");
+			printf("%d\n", src->value);
+			for (i = 0; i < 2; i++) {
+				if (src->next[i]) {
+					Enqueue(qptr, src->next[i]);
+					Enqueue(qptr, (void*)(depth + 1));
+				}
+			}
+	}
+	DestroyQueue(qptr);
+}
 void TreeClear(Tree tptr) {
 	if (tptr->head)
-		DestroyNode(tptr->head);
+		DestroyNode(tptr->head, 2);
 }
 void DestroyTree(Tree tptr) {
 	TreeClear(tptr);
@@ -76,9 +151,10 @@ int main(void) {
 	Tree btr = CreateTree();
 	srand((UINT)time(NULL));
 	for (; i < 100; i++) {
-		Node bnd = CreateNode(rand() % 101);
+		Node bnd = CreateNode((void*)(rand() % 101));
 		TreeInsertNode(btr, bnd);
 	}
 	TreePrint(btr);
+	TreePrintWithQueue(btr);
 	DestroyTree(btr);
 }
